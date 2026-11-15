@@ -1,6 +1,7 @@
 package proyecto
 
 import scala.util.Random
+import scala.annotation.tailrec
 
 /**
  * Detección de similitud entre documentos — versión secuencial.
@@ -70,8 +71,20 @@ object Similitud {
   /**
    * Pasa el texto a minúsculas, convierte en separador todo carácter que no
    * sea letra o dígito y devuelve el vector de palabras no vacías.
+   *
+   * Ejemplo: normalizar("!Hola, Mundo 2026!") == Vector("hola", "mundo", "2026")
    */
-  def normalizar(texto: String): Vector[String] = ???
+  def normalizar(texto: String): Vector[String] = {
+    @tailrec
+    def recorrer(cs: List[Char], actual: String, acc: Vector[String]) : Vector[String] = cs match {
+      case Nil => if (actual.isEmpty) acc else acc :+ actual
+      case c :: resto =>
+        if (c.isLetterOrDigit) recorrer(resto, actual + c, acc)
+        else if (actual.isEmpty) recorrer(resto, "", acc)
+        else recorrer(resto, "", acc :+ actual)
+    }
+    recorrer(texto.toLowerCase.toList, "", Vector())
+  }
 
   /**
    * Los t - k + 1 fragmentos de k palabras consecutivas, en el orden en que
