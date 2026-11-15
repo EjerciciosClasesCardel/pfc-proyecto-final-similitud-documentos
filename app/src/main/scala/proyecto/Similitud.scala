@@ -89,8 +89,14 @@ object Similitud {
   /**
    * Los t - k + 1 fragmentos de k palabras consecutivas, en el orden en que
    * aparecen; el vector vacío si el documento tiene menos de k palabras.
+   *
+   * Ejemplo: fragmentos(Vector("el", "gato", "duerme", "en"), 3) ==
+   * Vector(Vector("el", "gato", "duerme"), Vector("gato", "duerme", "en"))
    */
-  def fragmentos(ts: Vector[String], k: Int): Vector[Fragmento] = ???
+  def fragmentos(ts: Vector[String], k: Int): Vector[Fragmento] = {
+    if (ts.length < k) Vector()
+    else ts.take(k) +: fragmentos(ts.tail, k)
+  }
 
   /** El conjunto de fragmentos del documento: un repetido cuenta una vez. */
   def huella(d: Documento, k: Int): Huella = ???
@@ -101,8 +107,14 @@ object Similitud {
   /**
    * Índice de Jaccard de dos huellas, el tamaño de la intersección sobre el de
    * la unión. Dos huellas vacías dan cero y no dividen por cero.
+   *
+   * Ejemplo: jaccard(Set(Vector("a", Vector("b")), Set(Vector("b"), Vector("c"))) == 1.0 / 3.0
    */
-  def jaccard(h1: Huella, h2: Huella): Double = ???
+  def jaccard(h1: Huella, h2: Huella): Double = {
+    val comunes = (h1 intersect h2).size
+    val total = h1.size + h2.size - comunes
+    if (total == 0) 0.0 else comunes.toDouble / total
+  }
 
   /** Las n (n - 1) / 2 parejas (i, j) con i < j, en orden. */
   def parejas(n: Int): Vector[Pareja] = ???

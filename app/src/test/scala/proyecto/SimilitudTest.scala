@@ -97,4 +97,87 @@ class SimilitudTest extends AnyFunSuite {
     assert(detectarDirecto(c1, 3, 0.2, 5) == detectarConIndice(c1, 3, 0.2, 5))
     assert(detectarDirecto(c2, 3, 0.3, 5) == detectarConIndice(c2, 3, 0.3, 5))
   }
+
+  // normalizar
+    test("normalizar: quita signos de puntuación") {
+      assert(normalizar("¡Hola, Mundo!") == Vector("hola", "mundo"))
+    }
+
+    test("normalizar: separadores repetidos no generan palabras vacías") {
+      assert(normalizar("  a,,  b ;; ") == Vector("a", "b"))
+    }
+
+    test("normalizar: texto vacío o solo separadores da vector vacío") {
+      assert(normalizar("") == Vector())
+      assert(normalizar(" ,.;! ") == Vector())
+    }
+
+    test("normalizar: conserva dígitos y la última palabra sin separador") {
+      assert(normalizar("Taller 3: 100") == Vector("taller", "3", "100"))
+    }
+
+    test("normalizar: conserva tildes y la ñ en minúscula") {
+      assert(normalizar("AÑO Canción") == Vector("año", "canción"))
+    }
+
+  // fragmentos
+
+  test("fragmentos: con k = 1 cada palabra es un fragmento") {
+    assert(fragmentos(Vector("a", "b", "c"), 1) == Vector(Vector("a"), Vector("b"), Vector("c")))
+  }
+
+  test("fragmentos: con k igual al largo hay un solo fragmento") {
+    assert(fragmentos(Vector("a", "b", "c"), 3) == Vector(Vector("a", "b", "c")))
+  }
+
+  test("fragmentos: con menos de k palabras, o ninguna, no hay fragmentos") {
+    assert(fragmentos(Vector("a", "b"), 3) == Vector())
+    assert(fragmentos(Vector(), 1) == Vector())
+  }
+
+  test("fragmentos: conserva los repetidos, no es un conjunto") {
+    assert(fragmentos(Vector("a", "a", "a", "a"), 2) ==
+      Vector(Vector("a", "a"), Vector("a", "a"), Vector("a", "a")))
+  }
+
+  test("fragmentos: son t - k + 1 y el último termina en la última palabra") {
+    val ts = Vector.tabulate(10)(i => "w" + i)
+    val fs = fragmentos(ts, 4)
+    assert(fs.length == 7)
+    assert(fs.last == Vector("w6", "w7", "w8", "w9"))
+  }
+
+  // jaccard
+
+  test("jaccard: dos huellas iguales dan 1.0") {
+    val h: Huella = Set(Vector("a", "b"), Vector("b", "c"))
+    assert(math.abs(jaccard(h, h) - 1.0) < eps)
+  }
+
+  test("jaccard: huellas sin fragmentos en común dan 0.0") {
+    val h1: Huella = Set(Vector("a"), Vector("b"))
+    val h2: Huella = Set(Vector("c"), Vector("d"))
+    assert(jaccard(h1, h2) == 0.0)
+  }
+
+  test("jaccard: dos huellas vacías, o una vacía, dan 0.0 sin dividir por cero") {
+    val vacia: Huella = Set()
+    val h: Huella = Set(Vector("a"))
+    assert(jaccard(vacia, vacia) == 0.0)
+    assert(jaccard(vacia, h) == 0.0)
+    assert(jaccard(h, vacia) == 0)
+  }
+
+  test("jaccard: una huella contenida en otra") {
+    val h1: Huella = Set(Vector("a"), Vector("b"))
+    val h2: Huella = Set(Vector("a"), Vector("b"), Vector("c"))
+    assert(math.abs(jaccard(h1, h2) - 0.5) < eps)
+  }
+
+  test("jaccard: solapamiento parcial y simétrico") {
+    val h1: Huella = Set(Vector("a"), Vector("b"), Vector("c"))
+    val h2: Huella = Set(Vector("b"), Vector("c"), Vector("d"))
+    assert(math.abs(jaccard(h1, h2) - 0.4) < eps)
+    assert(jaccard(h1, h2) == jaccard(h2, h1))
+  }
 }
