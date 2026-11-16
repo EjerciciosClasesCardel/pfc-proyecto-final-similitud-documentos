@@ -72,7 +72,7 @@ object Similitud {
    * Pasa el texto a minúsculas, convierte en separador todo carácter que no
    * sea letra o dígito y devuelve el vector de palabras no vacías.
    *
-   * Ejemplo: normalizar("!Hola, Mundo 2026!") == Vector("hola", "mundo", "2026")
+   * Ejemplo: normalizar("¡Hola, Mundo 2026!") == Vector("hola", "mundo", "2026")
    */
   def normalizar(texto: String): Vector[String] = {
     @tailrec
@@ -108,7 +108,7 @@ object Similitud {
    * Índice de Jaccard de dos huellas, el tamaño de la intersección sobre el de
    * la unión. Dos huellas vacías dan cero y no dividen por cero.
    *
-   * Ejemplo: jaccard(Set(Vector("a", Vector("b")), Set(Vector("b"), Vector("c"))) == 1.0 / 3.0
+   * Ejemplo: jaccard(Set(Vector("a"), Vector("b")), Set(Vector("b"), Vector("c"))) == 1.0 / 3.0
    */
   def jaccard(h1: Huella, h2: Huella): Double = {
     val comunes = (h1 intersect h2).size
@@ -117,7 +117,12 @@ object Similitud {
   }
 
   /** Las n (n - 1) / 2 parejas (i, j) con i < j, en orden. */
-  def parejas(n: Int): Vector[Pareja] = ???
+  // Ejemplo: parejas(3) == Vector((0, 1), (0, 2), (1, 2))
+  def parejas(n: Int): Vector[Pareja] =
+    (for {
+      i <- 0 until n
+      j <- (i + 1) until n
+    } yield (i, j)).toVector
 
   /** La similitud de cada pareja que se le pase, en el mismo orden. */
   def similitudes(hs: Vector[Huella], ps: Vector[Pareja]): Vector[Medicion] = ???
@@ -131,15 +136,56 @@ object Similitud {
   /**
    * Las parejas que comparten al menos un fragmento, sin repetir y ordenadas.
    * Una misma pareja puede salir de varias entradas del índice.
+   *
+   * Ejemplo: parejasCandidatas(Map(Vector("a") -> Set(0, 1), Vector("b") -> Set(1, 2))) == Vector((0, 1), (1, 2))
    */
-  def parejasCandidatas(idx: Indice): Vector[Pareja] = ???
+  def parejasCandidatas(idx: Indice): Vector[Pareja] = {
+    val cand = (for {
+      ds <- idx.values.toList
+      i <- ds
+      j <- ds
+      if i < j
+    } yield (i, j)).toSet
+    if (cand.isEmpty) Vector()
+    else parejas(cand.map(par => par._2).max + 1).filter(par => cand.contains(par))
+  }
 
   /**
    * Las mediciones que alcanzan el umbral, de mayor a menor similitud y
    * truncadas a p. Los empates se rompen por posición, de modo que el
    * resultado no dependa del orden en que llegaron las mediciones.
+   *
+   * Ejemplo: ranking(Vector((0, 1, 0.4), (0, 2, 0.1), (1, 2, 0.9)), 0.3, 5) ==
+   *    Vector((1, 2, 0.9), (0, 1, 0.4))
    */
-  def ranking(ss: Vector[Medicion], umbral: Double, p: Int): Vector[Medicion] = ???
+  def ranking(ss: Vector[Medicion], umbral: Double, p: Int): Vector[Medicion] = {
+    // m1 va antes que m2: mayor similitud, y si empatan, menor posición (i, j).
+    def vaAntes(m1: Medicion, m2: Medicion): Boolean = {
+      m1._3 > m2._3 ||
+        (m1._3 == m2._3 && (m1._1 < m2._1 || (m1._1 == m2._1 && m1._2 < m2._2)))
+    }
+
+    @tailrec
+    def mezclar(xs: List[Medicion], ys: List[Medicion],
+                acc: List[Medicion]): List[Medicion] = (xs, ys) match {
+      case (Nil, _) => acc.reverse ++ ys
+      case (_, Nil) => acc.reverse ++ xs
+      case (x :: xs1, y :: ys1) =>
+        if(vaAntes(x, y)) mezclar(xs1, ys, x :: acc)
+        else mezclar(xs, ys1, y :: acc)
+    }
+
+    def msort(xs: List[Medicion]) : List[Medicion] = {
+      val n = xs.length / 2
+      if (n == 0) xs
+      else {
+        val (l1, l2) = xs.splitAt(n)
+        mezclar(msort(l1), msort(l2), Nil)
+      }
+    }
+
+    msort(ss.filter(m => m._3 >= umbral).toList).toVector.take(p)
+  }
 
   /** Solución directa: compara las n (n - 1) / 2 parejas. */
   def detectarDirecto(c: Corpus, k: Int, umbral: Double,
