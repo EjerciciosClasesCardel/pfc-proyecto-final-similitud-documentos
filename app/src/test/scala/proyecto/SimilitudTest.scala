@@ -40,6 +40,22 @@ class SimilitudTest extends AnyFunSuite {
     assert(normalizar("El Gato Duerme") == Vector("el", "gato", "duerme"))
   }
 
+  test("normalizar: puntuación y mayúsculas") {
+    assert(Similitud.normalizar("El gato, duerme!") == Vector("el", "gato", "duerme"))
+  }
+  test("normalizar: espacios múltiples") {
+    assert(Similitud.normalizar("a   b") == Vector("a", "b"))
+  }
+  test("normalizar: texto vacío") {
+    assert(Similitud.normalizar("") == Vector())
+  }
+  test("normalizar: solo signos") {
+    assert(Similitud.normalizar("...,;!") == Vector())
+  }
+  test("normalizar: dígitos") {
+    assert(Similitud.normalizar("Punto 3: ok") == Vector("punto", "3", "ok"))
+  }
+
   test("fragmentos: son las ventanas consecutivas, en orden") {
     val ts = Vector("a", "b", "c", "d")
     assert(fragmentos(ts, 2) ==

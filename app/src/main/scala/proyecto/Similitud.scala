@@ -71,7 +71,12 @@ object Similitud {
    * Pasa el texto a minúsculas, convierte en separador todo carácter que no
    * sea letra o dígito y devuelve el vector de palabras no vacías.
    */
-  def normalizar(texto: String): Vector[String] = ???
+  def normalizar(texto: String): Vector[String] = {
+    texto.toLowerCase.map(c => if (c.isLetterOrDigit) c else ' ')
+      .split(' ')
+      .filter(_.nonEmpty)
+      .toVector
+  }
 
   /**
    * Los t - k + 1 fragmentos de k palabras consecutivas, en el orden en que
