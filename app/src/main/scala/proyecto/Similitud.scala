@@ -124,26 +124,49 @@ object Similitud {
     } yield (i,j)).toVector
   }
   /** La similitud de cada pareja que se le pase, en el mismo orden. */
-  def similitudes(hs: Vector[Huella], ps: Vector[Pareja]): Vector[Medicion] = ???
+  def similitudes(hs: Vector[Huella], ps: Vector[Pareja]): Vector[Medicion] =
+    ps.map { case (i, j) => (i, j, jaccard(hs(i), hs(j))) }
 
   /**
    * El mapa de cada fragmento al conjunto de documentos donde aparece, con los
    * documentos identificados por su posición en el vector de huellas.
    */
-  def indiceInvertido(hs: Vector[Huella]): Indice = ???
+  def indiceInvertido(hs: Vector[Huella]): Indice =
+    hs.zipWithIndex.foldLeft(Map.empty[Fragmento, Set[Int]]) {
+      case (indice, (huellaActual, posicion)) =>
+        huellaActual.foldLeft(indice) { (acumulado, fragmento) =>
+          acumulado.updated(
+            fragmento,
+            acumulado.getOrElse(fragmento, Set.empty[Int]) + posicion
+          )
+        }
+    }
 
   /**
    * Las parejas que comparten al menos un fragmento, sin repetir y ordenadas.
    * Una misma pareja puede salir de varias entradas del índice.
    */
-  def parejasCandidatas(idx: Indice): Vector[Pareja] = ???
+  def parejasCandidatas(idx: Indice): Vector[Pareja] =
+    idx.values.toVector.flatMap { documentos =>
+      val ordenados = documentos.toVector.sorted
+      parejas(ordenados.length).map { case (i, j) =>
+        (ordenados(i), ordenados(j))
+      }
+    }.distinct.sorted
 
   /**
    * Las mediciones que alcanzan el umbral, de mayor a menor similitud y
    * truncadas a p. Los empates se rompen por posición, de modo que el
    * resultado no dependa del orden en que llegaron las mediciones.
    */
-  def ranking(ss: Vector[Medicion], umbral: Double, p: Int): Vector[Medicion] = ???
+  def ranking(ss: Vector[Medicion], umbral: Double, p: Int): Vector[Medicion] =
+    ss.filter(_._3 >= umbral)
+      .sortWith { (a, b) =>
+        if (a._3 != b._3) a._3 > b._3
+        else if (a._1 != b._1) a._1 < b._1
+        else a._2 < b._2
+      }
+      .take(p)
 
   /** Solución directa: compara las n (n - 1) / 2 parejas. */
   def detectarDirecto(c: Corpus, k: Int, umbral: Double,
