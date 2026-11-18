@@ -98,9 +98,7 @@ class SimilitudTest extends AnyFunSuite {
     assert(detectarDirecto(c2, 3, 0.3, 5) == detectarConIndice(c2, 3, 0.3, 5))
   }
 
-  // ===========================================================================
-  // Integrante 2: jaccard, parejas, similitudes
-  // ===========================================================================
+  ///INTEGRANTE 2
 
   /** Una huella a partir de fragmentos escritos como "a b c". */
   def i2hu(fs: String*): Huella = fs.map(_.split(" ").toVector).toSet
@@ -158,7 +156,7 @@ class SimilitudTest extends AnyFunSuite {
 
   test("jaccard: queda en [0, 1] y cumple la definición en corpus al azar") {
     val hs = i2HuellasLocales(corpusAlAzar(20, 80, 10), 2)
-    val todas = for { a <- hs; b <- hs } yield (a, b)
+    val todas = for {a <- hs; b <- hs} yield (a, b)
     assert(todas.forall { case (a, b) =>
       val j = jaccard(a, b)
       val esperado = a.intersect(b).size.toDouble / a.union(b).size
@@ -256,5 +254,92 @@ class SimilitudTest extends AnyFunSuite {
     val ms = similitudes(hs, parejas(c.length))
     val mejor = ms.maxBy(_._3)
     assert((mejor._1, mejor._2) == ((0, 10)))
+  }
+
+  ///INTEGRANTE 3
+
+  /** Una huella a partir de fragmentos escritos como "a b c". */
+  def ixhu(fs: String*): Huella = fs.map(_.split(" ").toVector).toSet
+
+  /** Un fragmento escrito como "a b c". */
+  def ixfr(f: String): Fragmento = f.split(" ").toVector
+
+  /** Huella calculada sin usar las funciones de otros integrantes. */
+  def ixHuellaLocal(d: Documento, k: Int): Huella =
+    d._2.sliding(k).filter(_.length == k).map(_.toVector).toSet
+
+  def ixHuellasLocales(c: Corpus, k: Int): Vector[Huella] =
+    c.map(ixHuellaLocal(_, k))
+
+  // --- indiceInvertido -------------------------------------------------------
+
+  test("indiceInvertido: sin huellas el índice es vacío") {
+    assert(indiceInvertido(Vector()) == Map())
+  }
+
+  test("indiceInvertido: una huella vacía no aporta entradas y las posiciones se respetan") {
+    val hs: Vector[Huella] = Vector(Set(), ixhu("a b"), Set())
+    assert(indiceInvertido(hs) == Map(ixfr("a b") -> Set(1)))
+  }
+
+  test("indiceInvertido: un fragmento en tres huellas queda con los tres") {
+    val hs = Vector(ixhu("a b", "x y"), ixhu("a b"), ixhu("a b", "z z"))
+    val idx = indiceInvertido(hs)
+    assert(idx(ixfr("a b")) == Set(0, 1, 2))
+    assert(idx(ixfr("x y")) == Set(0) && idx(ixfr("z z")) == Set(2))
+  }
+
+  test("indiceInvertido: ejemplo armado a mano con todas sus entradas") {
+    val hs = Vector(ixhu("a b", "b c"), ixhu("b c", "c d"), ixhu("c d"))
+    assert(indiceInvertido(hs) == Map(
+      ixfr("a b") -> Set(0),
+      ixfr("b c") -> Set(0, 1),
+      ixfr("c d") -> Set(1, 2)))
+  }
+
+  test("indiceInvertido: g está en la huella i si y solo si i está en idx(g)") {
+    val hs = ixHuellasLocales(corpusAlAzar(25, 50, 10), 2)
+    val idx = indiceInvertido(hs)
+    val todosLosFragmentos = hs.flatten.toSet
+    assert(idx.keySet == todosLosFragmentos)
+    assert(idx.values.forall(_.nonEmpty))
+    assert(hs.indices.forall(i =>
+      todosLosFragmentos.forall(g => hs(i).contains(g) == idx(g).contains(i))))
+  }
+
+  // --- parejasCandidatas -----------------------------------------------------
+
+  test("parejasCandidatas: un índice vacío no tiene parejas") {
+    assert(parejasCandidatas(Map()) == Vector())
+  }
+
+  test("parejasCandidatas: si cada fragmento está en un solo documento no hay candidatas") {
+    val idx: Indice = Map(ixfr("a b") -> Set(0), ixfr("b c") -> Set(1),
+      ixfr("c d") -> Set(2))
+    assert(parejasCandidatas(idx) == Vector())
+  }
+
+  test("parejasCandidatas: una pareja que sale de varios fragmentos aparece una sola vez") {
+    val idx: Indice = Map(ixfr("a b") -> Set(0, 1), ixfr("b c") -> Set(0, 1),
+      ixfr("c d") -> Set(0, 1))
+    assert(parejasCandidatas(idx) == Vector((0, 1)))
+  }
+
+  test("parejasCandidatas: salen con i < j y ordenadas, sin importar el orden de los conjuntos") {
+    val idx: Indice = Map(
+      ixfr("a b") -> Set(3, 0),
+      ixfr("b c") -> Set(2, 1),
+      ixfr("c d") -> Set(4, 0, 3))
+    assert(parejasCandidatas(idx) == Vector((0, 3), (0, 4), (1, 2), (3, 4)))
+  }
+
+  test("parejasCandidatas: son exactamente las parejas con huellas que se intersectan") {
+    val hs = ixHuellasLocales(corpusAlAzar(30, 40, 20), 3)
+    val esperado = (for {
+      i <- hs.indices
+      j <- i + 1 until hs.length
+      if hs(i).intersect(hs(j)).nonEmpty
+    } yield (i, j)).toVector
+    assert(parejasCandidatas(indiceInvertido(hs)) == esperado)
   }
 }
