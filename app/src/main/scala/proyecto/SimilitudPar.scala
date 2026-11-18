@@ -25,7 +25,19 @@ object SimilitudPar {
    * calculan en paralelo. El orden de las mediciones es el de `ps`.
    */
   def similitudesPar(hs: Vector[Huella], ps: Vector[Pareja],
-                     corte: Int): Vector[Medicion] = ???
+                     corte: Int): Vector[Medicion] = {
+    // Con menos de dos parejas no hay nada que partir: sin esta guarda, un
+    // corte menor o igual que cero partiría un vector de una pareja en uno
+    // vacío y el mismo de una pareja, y la recursión no terminaría.
+    if (ps.length <= corte || ps.length < 2) similitudes(hs, ps)
+    else {
+      val (izquierda, derecha) = ps.splitAt(ps.length / 2)
+      val (mi, md) = parallel(
+        similitudesPar(hs, izquierda, corte),
+        similitudesPar(hs, derecha, corte))
+      mi ++ md
+    }
+  }
 
   /**
    * Une dos índices. Cuando un fragmento está en los dos, el conjunto
