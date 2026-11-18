@@ -108,13 +108,27 @@ object Similitud {
    * El mapa de cada fragmento al conjunto de documentos donde aparece, con los
    * documentos identificados por su posición en el vector de huellas.
    */
-  def indiceInvertido(hs: Vector[Huella]): Indice = ???
+  def indiceInvertido(hs: Vector[Huella]): Indice = {
+    val pares = for {
+      (h, i) <- hs zip (0 until hs.length)
+      g <- h
+    } yield (g, i)
+    pares.groupBy(_._1).map { case (g, ps) => (g, ps.map(_._2).toSet) }
+  }
 
   /**
    * Las parejas que comparten al menos un fragmento, sin repetir y ordenadas.
    * Una misma pareja puede salir de varias entradas del índice.
    */
-  def parejasCandidatas(idx: Indice): Vector[Pareja] = ???
+  def parejasCandidatas(idx: Indice): Vector[Pareja] = {
+    val todas = for {
+      docs <- idx.values.toVector
+      i <- docs.toVector
+      j <- docs.toVector
+      if i < j
+    } yield (i, j)
+    todas.distinct.sorted
+  }
 
   /**
    * Las mediciones que alcanzan el umbral, de mayor a menor similitud y
