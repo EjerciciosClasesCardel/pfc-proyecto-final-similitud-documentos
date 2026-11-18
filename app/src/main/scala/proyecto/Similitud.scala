@@ -121,13 +121,29 @@ object Similitud {
    * truncadas a p. Los empates se rompen por posición, de modo que el
    * resultado no dependa del orden en que llegaron las mediciones.
    */
-  def ranking(ss: Vector[Medicion], umbral: Double, p: Int): Vector[Medicion] = ???
+  def ranking(ss: Vector[Medicion], umbral: Double, p: Int): Vector[Medicion] = {
+    if (p <= 0) Vector.empty
+    else {
+      ss.filter(m => m._3 >= umbral)
+        .sortBy(m => (-m._3, m._1, m._2))
+        .take(p)
+    }
+  }
 
   /** Solución directa: compara las n (n - 1) / 2 parejas. */
-  def detectarDirecto(c: Corpus, k: Int, umbral: Double,
-                      p: Int): Vector[Medicion] = ???
+  def detectarDirecto(c: Corpus, k: Int, umbral: Double, p: Int): Vector[Medicion] = {
+    val hs = huellas(c, k)
+    val ps = parejas(c.length)
+    val ss = similitudes(hs, ps)
+    ranking(ss, umbral, p)
+  }
 
   /** Solución con índice: compara solo las parejas candidatas. */
-  def detectarConIndice(c: Corpus, k: Int, umbral: Double,
-                        p: Int): Vector[Medicion] = ???
+  def detectarConIndice(c: Corpus, k: Int, umbral: Double,  p: Int): Vector[Medicion] = {
+    val hs = huellas(c, k)
+    val idx = indiceInvertido(hs)
+    val ps = parejasCandidatas(idx)
+    val ss = similitudes(hs, ps)
+    ranking(ss, umbral, p)
+  }
 }
