@@ -17,12 +17,12 @@ considera que no hizo parte del proyecto y su nota individual es 0.0, por más
 commits que tenga. Si falta alguno, la entrega se sanciona con el 20 % de la
 nota.
 
-| Nombre completo | Código |
-|---|---|
-| | |
-|David Alejandro López Álvarez |2559790 |
-| | |
-| | |
+| Nombre completo               | Código  |
+|-------------------------------|---------|
+| Santiago Velandia Lozano      | 2559822 |
+| David Alejandro López Álvarez | 2559790 |
+|                               |         |
+|                               |         |
 
 ## El problema, en una línea
 
