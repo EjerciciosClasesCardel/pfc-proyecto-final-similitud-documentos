@@ -45,15 +45,62 @@ class SimilitudTest extends AnyFunSuite {
     assert(fragmentos(ts, 2) ==
       Vector(Vector("a", "b"), Vector("b", "c"), Vector("c", "d")))
   }
-
+  // huella
   test("huella: el ejemplo 1 tiene 4, 4 y 3 fragmentos") {
     assert(huella(d0, 3).size == 4)
     assert(huella(d1, 3).size == 4)
     assert(huella(d2, 3).size == 3)
   }
 
+  test("huella: un fragmento repetido cuenta una sola vez"){
+    val d: Documento = ("x", Vector("a", "b", "a", "b"))
+    assert(huella(d, 2) == Set(Vector("a", "b"), Vector("b", "a")))
+  }
   test("huellas: hay una huella por documento") {
     assert(huellas(c1, 3).length == 3)
+  }
+  test("huella: un documento con menos de k palabras tiene huella vacía"){
+    val d: Documento = ("x", Vector("a", "b"))
+    assert(huella(d, 3) == Set[Fragmento]())
+  }
+  test("huella: con k = 1 son las palabras distintas"){
+    val d: Documento = ("y", Vector("a", "a", "b"))
+    assert(huella(d, 1) == Set(Vector("a"), Vector("b")))
+  }
+
+  test("huella: sin repeticiones hay t 'k + 1"){
+    val d: Documento = ("z", Vector("a", "b", "c", "d", "e"))
+    assert(huella(d, 3).size == 5 - 3 + 1)
+    assert(huella(d, 3).contains(Vector("c", "d", "e")))
+  }
+  test("huella: un documento de una sola palabra repetida tiene un fragmento"){
+    val d: Documento = ("w", Vector.fill(6)("z"))
+    assert(huella(d, 2) == Set(Vector("z", "z")))
+  }
+  // huellas
+  test("huellas: un corpus vacío de un vector vacía"){
+    assert(huellas(Vector(), 3) == Vector[Huella]())
+  }
+
+  test("huellas: un corpus de un solo documento da una sola huella"){
+    val c: Corpus = Vector(("a", Vector("x", "y", "z")))
+    assert(huellas(c, 2) == Vector(Set(Vector("x", "y"), Vector("y", "z"))))
+  }
+
+  test("huellas: la posición i es la huella del documento i") {
+    val c: Corpus = Vector(("a", Vector("x", "y", "z")), ("b", Vector("x", "y")), ("c", Vector("p", "q", "r", "s")))
+    assert((0 until c.length).forall(i => huellas(c, 2)(i) == huella(c(i), 2)))
+  }
+
+  test("huellas: conserva la orden del corpus") {
+    val c: Corpus = Vector(("a", Vector("x", "y")), ("b", Vector("p", "q", "r")))
+    assert(huellas(c, 2) ==
+      Vector(Set(Vector("x", "y")), Set(Vector("p", "q"), Vector("q", "r"))))
+  }
+
+  test("huellas: un documento corto deja su huella vacía en su posición") {
+    val c: Corpus = Vector(("a", Vector("x")), ("b", Vector("p", "q")))
+    assert(huellas(c, 2) == Vector(Set[Fragmento](), Set(Vector("p", "q"))))
   }
 
   test("jaccard: ejemplo 2, las dos parejas dan 0.75 y 0.5") {
@@ -64,16 +111,85 @@ class SimilitudTest extends AnyFunSuite {
   test("parejas: hay n (n - 1) / 2") {
     assert(parejas(5).length == 10)
   }
-
+  // similitudes
   test("similitudes: el ejemplo 1 da 1/3, 0 y 0") {
     val hs = huellas(c1, 3)
     val ms = similitudes(hs, parejas(3)).map(_._3)
     assert(math.abs(ms(0) - 2.0 / 6.0) < eps && ms(1) == 0.0 && ms(2) == 0.0)
   }
+  val hs3: Vector[Huella] = Vector(
+    Set(Vector("a"), Vector("b")),
+    Set(Vector("b"), Vector("c")),
+    Set(Vector("x"))
+  )
 
+  test("similitudes: una pareja con un fragmento común de tres de 1/3") {
+    val ms = similitudes(hs3, Vector((0, 1)))
+    assert(ms.length == 1 && ms(0)._1 == 0 && ms(0)._2 ==1)
+    assert(math.abs(ms(0)._3 - 1.0 / 3.0) < eps)
+  }
+
+  test("similitudes: respeta el orden de las parejas que recibe") {
+    val ms = similitudes(hs3, Vector((1, 2), (0, 1)))
+    assert(ms.map(m => (m._1, m._2)) == Vector((1, 2), (0, 1)))
+    assert(ms(0)._3 == 0.0)
+  }
+
+  test("similitudes: sin parejas no hay mediciones") {
+    assert(similitudes(hs3, Vector()) == Vector[Medicion]())
+  }
+
+  test("similitudes: dos documentos con la misma huella de 1") {
+    val iguales: Vector[Huella] = Vector(Set(Vector("a")), Set(Vector("a")))
+    assert(similitudes(iguales, Vector((0, 1))).map(_._3) == Vector(1.0))
+  }
+
+  test("similitudes:  dos huellas vacías de 0") {
+    val vacias: Vector[Huella] = Vector(Set[Fragmento](), Set[Fragmento]())
+    assert(similitudes(vacias, Vector((0, 1))).map(_._3) == Vector(0.0))
+  }
+  // indiceInvertido
   test("indiceInvertido: el fragmento inicial de d0 está en d0 y en d1") {
     val idx = indiceInvertido(huellas(c1, 3))
     assert(idx(Vector("el", "gato", "duerme")) == Set(0, 1))
+  }
+
+  test("indiceInvertido: un fragmento que está en los tres documentos"){
+    val hs: Vector[Huella] = Vector(
+      Set(Vector("a"), Vector("b")),
+      Set(Vector("b"), Vector("c")),
+      Set(Vector("b")))
+    assert(indiceInvertido(hs)(Vector("b")) == Set(0, 1, 2))
+
+  }
+
+  test("indiceInvertido: un fragmento que está en un solo documento"){
+    val hs: Vector[Huella] = Vector(
+      Set(Vector("a"), Vector("b")),
+      Set(Vector("b"), Vector("c")),
+      Set(Vector("b")))
+    assert(indiceInvertido(hs)(Vector("a")) == Set(0))
+    assert(indiceInvertido(hs)(Vector("c")) == Set(1))
+  }
+
+  test("indiceInvertido: el índice completo de tres huellas") {
+    val hs: Vector[Huella] = Vector(
+      Set(Vector("a"), Vector("b")),
+      Set(Vector("b"), Vector("c")),
+      Set(Vector("b")))
+    assert(indiceInvertido(hs) == Map(
+      Vector("a") -> Set(0),
+      Vector("b") -> Set(0, 1, 2),
+      Vector("c") -> Set(1)))
+  }
+
+  test("indiceInvertido: un fragmento que nadie tiene no aparece"){
+    val hs: Vector[Huella] = Vector(Set(Vector("a")), Set(Vector("b")))
+    assert(!indiceInvertido(hs).contains(Vector("z")))
+  }
+
+  test("indiceInvertido: sin huellas el índice queda vacío"){
+    assert(indiceInvertido(Vector[Huella]()) == Map())
   }
 
   test("parejasCandidatas: en el ejemplo 2 quedan dos de seis") {
@@ -93,8 +209,271 @@ class SimilitudTest extends AnyFunSuite {
     assert(math.abs(r(0)._3 - 0.75) < eps && math.abs(r(1)._3 - 0.5) < eps)
   }
 
+  // Nuevas pruebas detectarDirecto
+
+  test("detectarDirecto: Corpus vacío"){
+    val corpus: Corpus = Vector()
+    assert(detectarDirecto(corpus, 2, 0.2, 5) ==
+      Vector())
+  }
+
+  test("detectarDirecto: Un documento"){
+    val corpus: Corpus = Vector(
+      ("d0", Vector("a", "b"))
+    )
+    assert(detectarDirecto(corpus, 2, 0.2, 5) ==
+      Vector())
+  }
+
+  test("detectarDirecto: Documentos iguales"){
+    val corpus: Corpus = Vector(
+      ("d0", Vector("a", "b")),
+      ("d1", Vector("a", "b"))
+    )
+    assert(detectarDirecto(corpus, 2, 0.2, 5) ==
+      Vector((0, 1, 1.0)))
+  }
+
+  test("detectarDirecto: Documentos diferentes"){
+    val corpus: Corpus = Vector(
+      ("d0", Vector("a", "b")),
+      ("d1", Vector("x", "y"))
+    )
+    assert(detectarDirecto(corpus, 2, 0.2, 5) ==
+      Vector())
+  }
+
+  test("detectarDirecto: Ranking de similitud"){
+    val corpus: Corpus = Vector(
+      ("d0", Vector("a", "b")),
+      ("d1", Vector("a", "b")),
+      ("d2", Vector("a"))
+    )
+    assert(detectarDirecto(corpus, 1, 0.2, 1) ==
+      Vector((0, 1, 1.0)))
+  }
+
   test("detectar: las dos soluciones coinciden en los ejemplos") {
     assert(detectarDirecto(c1, 3, 0.2, 5) == detectarConIndice(c1, 3, 0.2, 5))
     assert(detectarDirecto(c2, 3, 0.3, 5) == detectarConIndice(c2, 3, 0.3, 5))
+  }
+
+
+  // Nuevos test de detectarConIndice
+
+  test("dectarConIndice: Corpus vacío"){
+    val corpus: Corpus = Vector()
+    assert(detectarConIndice(corpus, 2, 0.2, 5) ==
+      Vector())
+  }
+
+  test("dectarConIndice: Un documento"){
+    val corpus: Corpus = Vector(
+      ("d0", Vector("a", "b"))
+    )
+    assert(detectarConIndice(corpus, 2, 0.2, 5) ==
+      Vector())
+  }
+
+  test("dectarConIndice: Documentos iguales"){
+    val corpus: Corpus = Vector(
+      ("d0", Vector("a", "b")),
+      ("d1", Vector("a", "b")),
+    )
+    assert(detectarConIndice(corpus, 2, 0.2, 5) ==
+      Vector((0, 1, 1.0)))
+  }
+
+  test("dectarConIndice: Documentos diferentes"){
+    val corpus: Corpus = Vector(
+      ("d0", Vector("a", "b")),
+      ("d1", Vector("x", "y")),
+    )
+    assert(detectarConIndice(corpus, 2, 0.2, 5) ==
+      Vector())
+  }
+
+  test("dectarConIndice: Una pareja candidata"){
+    val corpus: Corpus = Vector(
+      ("d0", Vector("a", "b", "c")),
+      ("d1", Vector("a", "b", "d")),
+    )
+    assert(detectarConIndice(corpus, 2, 0.2, 5) ==
+      Vector((0, 1, 1.0 / 3.0)))
+  }
+
+  // normalizar
+    test("normalizar: quita signos de puntuación") {
+      assert(normalizar("¡Hola, Mundo!") == Vector("hola", "mundo"))
+    }
+
+    test("normalizar: separadores repetidos no generan palabras vacías") {
+      assert(normalizar("  a,,  b ;; ") == Vector("a", "b"))
+    }
+
+    test("normalizar: texto vacío o solo separadores da vector vacío") {
+      assert(normalizar("") == Vector())
+      assert(normalizar(" ,.;! ") == Vector())
+    }
+
+    test("normalizar: conserva dígitos y la última palabra sin separador") {
+      assert(normalizar("Taller 3: 100") == Vector("taller", "3", "100"))
+    }
+
+    test("normalizar: conserva tildes y la ñ en minúscula") {
+      assert(normalizar("AÑO Canción") == Vector("año", "canción"))
+    }
+
+  // fragmentos
+
+  test("fragmentos: con k = 1 cada palabra es un fragmento") {
+    assert(fragmentos(Vector("a", "b", "c"), 1) == Vector(Vector("a"), Vector("b"), Vector("c")))
+  }
+
+  test("fragmentos: con k igual al largo hay un solo fragmento") {
+    assert(fragmentos(Vector("a", "b", "c"), 3) == Vector(Vector("a", "b", "c")))
+  }
+
+  test("fragmentos: con menos de k palabras, o ninguna, no hay fragmentos") {
+    assert(fragmentos(Vector("a", "b"), 3) == Vector())
+    assert(fragmentos(Vector(), 1) == Vector())
+  }
+
+  test("fragmentos: conserva los repetidos, no es un conjunto") {
+    assert(fragmentos(Vector("a", "a", "a", "a"), 2) ==
+      Vector(Vector("a", "a"), Vector("a", "a"), Vector("a", "a")))
+  }
+
+  test("fragmentos: son t - k + 1 y el último termina en la última palabra") {
+    val ts = Vector.tabulate(10)(i => "w" + i)
+    val fs = fragmentos(ts, 4)
+    assert(fs.length == 7)
+    assert(fs.last == Vector("w6", "w7", "w8", "w9"))
+  }
+
+  // jaccard
+
+  test("jaccard: dos huellas iguales dan 1.0") {
+    val h: Huella = Set(Vector("a", "b"), Vector("b", "c"))
+    assert(math.abs(jaccard(h, h) - 1.0) < eps)
+  }
+
+  test("jaccard: huellas sin fragmentos en común dan 0.0") {
+    val h1: Huella = Set(Vector("a"), Vector("b"))
+    val h2: Huella = Set(Vector("c"), Vector("d"))
+    assert(jaccard(h1, h2) == 0.0)
+  }
+
+  test("jaccard: dos huellas vacías, o una vacía, dan 0.0 sin dividir por cero") {
+    val vacia: Huella = Set()
+    val h: Huella = Set(Vector("a"))
+    assert(jaccard(vacia, vacia) == 0.0)
+    assert(jaccard(vacia, h) == 0.0)
+    assert(jaccard(h, vacia) == 0.0)
+  }
+
+  test("jaccard: una huella contenida en otra") {
+    val h1: Huella = Set(Vector("a"), Vector("b"))
+    val h2: Huella = Set(Vector("a"), Vector("b"), Vector("c"), Vector("d"))
+    assert(math.abs(jaccard(h1, h2) - 0.5) < eps)
+  }
+
+  test("jaccard: solapamiento parcial y simétrico") {
+    val h1: Huella = Set(Vector("a"), Vector("b"), Vector("c"))
+    val h2: Huella = Set(Vector("b"), Vector("c"), Vector("d"), Vector("e"))
+    assert(math.abs(jaccard(h1, h2) - 0.4) < eps)
+    assert(jaccard(h1, h2) == jaccard(h2, h1))
+  }
+
+  //parejas
+
+  test("parejas: con n = 4 salen las seis, en orden") {
+    assert(parejas(4) ==
+    Vector((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)))
+  }
+
+  test("parejas: con n = 0 o n = 1 no hay parejas") {
+    assert(parejas(0) == Vector())
+    assert(parejas(1) == Vector())
+  }
+
+  test("parejas: con n = 2 hay una sola") {
+    assert(parejas(2) == Vector((0, 1)))
+  }
+
+  test("parejas: siempre i < j, y son n (n - 1) / 2") {
+    val ps = parejas(10)
+    assert(ps.length == 45)
+    assert(ps.forall(p => p._1 < p._2))
+  }
+
+  test("parejas: sin repetidos, dentro del rango y ordenadas") {
+    val ps = parejas(7)
+    assert(ps.distinct == ps)
+    assert(ps.forall(p => p._1 >= 0 && p._2 < 7))
+    assert(ps == ps.sortBy(p => (p._1, p._2)))
+  }
+
+  // ranking
+
+  test("ranking: el umbral es inclusivo (>=)") {
+    val ss: Vector[Medicion] = Vector((0, 1, 0.5), (0, 2, 0.4), (1, 2, 0.6))
+    assert(ranking(ss, 0.5, 10) == Vector((1, 2, 0.6), (0, 1, 0.5)))
+  }
+
+  test("ranking: los empates se rompen por posición, sin importar el orden de llegada") {
+    val ss: Vector[Medicion] = Vector((1, 2, 0.5), (0, 2, 0.5), (0, 1, 0.5))
+    val esperado: Vector[Medicion] = Vector((0, 1, 0.5), (0, 2, 0.5), (1, 2, 0.5))
+    assert(ranking(ss, 0.0, 10) == esperado)
+    assert(ranking(ss.reverse, 0.0, 10) == esperado)
+  }
+
+  test("ranking: trunca a p, y p = 0 o p mayor al total se comportan") {
+    val ss: Vector[Medicion] = Vector((0, 1, 0.4), (0, 2, 0.1), (1, 2, 0.9))
+    assert(ranking(ss, 0.0, 2) == Vector((1, 2, 0.9), (0, 1, 0.4)))
+    assert(ranking(ss, 0.0, 0) == Vector())
+    assert(ranking(ss, 0.0, 50).length == 3)
+  }
+
+  test("ranking: vacío, o ninguna alcanza el umbral, da vacío") {
+    val ss: Vector[Medicion] = Vector((0, 1, 0.4), (0, 2, 0.1))
+    assert(ranking(Vector(), 0.0, 5) == Vector())
+    assert(ranking(ss, 0.99, 5) == Vector())
+  }
+
+  test("ranking: ordena bien un vector más largo") {
+    val ss: Vector[Medicion] = Vector((0, 1, 0.2), (0, 2, 0.9), (0, 3, 0.5),
+      (1, 2, 0.7), (1, 3, 0.1), (2, 3, 0.8), (0, 4, 0.3), (1, 4, 0.6))
+    assert(ranking(ss, 0.0, 10).map(m => m._3) ==
+      Vector(0.9, 0.8, 0.7, 0.6, 0.5, 0.3, 0.2, 0.1))
+  }
+
+  // parejasCandidatas
+
+  test("parejasCandidatas: un índice vacío no da parejas") {
+    val idx: Indice = Map()
+    assert(parejasCandidatas(idx) == Vector())
+  }
+
+  test("parejasCandidatas: fragmentos de un solo documento no dan parejas") {
+    val idx: Indice = Map(Vector("a") -> Set(0), Vector("b") -> Set(1))
+    assert(parejasCandidatas(idx) == Vector())
+  }
+
+  test("parejasCandidatas: una pareja en varias entradas sale una sola vez") {
+    val idx: Indice = Map(
+      Vector("a") -> Set(0, 1), Vector("b") -> Set(0, 1), Vector("c") -> Set(0, 1))
+    assert(parejasCandidatas(idx) == Vector((0, 1)))
+  }
+
+  test("parejasCandidatas: tres documentos juntos dan sus tres parejas, ordenadas") {
+    val idx: Indice = Map(Vector("a") -> Set(2, 0, 1))
+    assert(parejasCandidatas(idx) == Vector((0, 1), (0, 2), (1, 2)))
+  }
+
+  test("parejasCandidatas: entradas mezcladas salen ordenadas y sin las no candidatas") {
+    val idx: Indice = Map(
+      Vector("a") -> Set(3, 4), Vector("b") -> Set(0, 2), Vector("c") -> Set(1, 4))
+    assert(parejasCandidatas(idx) == Vector((0, 2), (1, 4), (3, 4)))
   }
 }
