@@ -21,7 +21,7 @@ nota.
 |-------------------------------|---------|
 | Santiago Velandia Lozano      | 2559822 |
 | David Alejandro López Álvarez | 2559790 |
-|                               |         |
+| Juaan Stevan Cataño Hernandez | 2559832 |
 |                               |         |
 
 ## El problema, en una línea
