@@ -10,8 +10,7 @@ import Similitud._
  * valores de los dos ejemplos del enunciado. No se modifican.
  *
  * La rúbrica pide además cinco casos propios por función, distintos de estos y
- * de los ejemplos del enunciado. Van al final de este archivo o en un archivo
- * nuevo de esta misma carpeta; las dos formas valen.
+ * de los ejemplos del enunciado. Se agregan al final de este archivo.
  */
 @RunWith(classOf[JUnitRunner])
 class SimilitudTest extends AnyFunSuite {
@@ -249,6 +248,127 @@ class SimilitudTest extends AnyFunSuite {
     // Verificamos el primer y el último elemento de la secuencia
     assert(parejas(5).head == (0, 1))
     assert(parejas(5).last == (3, 4))
+  }
+
+  // Casos propios para las funciones seleccionadas: al final del archivo y
+  // distintos de las pruebas de contrato y entre sí.
+  test("similitudes calcula una intersección parcial sobre la unión") {
+    val hs = Vector(
+      Set(Vector("a"), Vector("b")),
+      Set(Vector("a"), Vector("b"), Vector("c")),
+      Set(Vector("z"))
+    )
+    assert(similitudes(hs, Vector((0, 1))).map(_._3) == Vector(2.0 / 3.0))
+  }
+
+  test("similitudes conserva el orden de las parejas recibidas") {
+    val hs = Vector(Set(Vector("x")), Set(Vector("x")), Set(Vector("y")))
+    assert(similitudes(hs, Vector((1, 2), (0, 1))) ==
+      Vector((1, 2, 0.0), (0, 1, 1.0)))
+  }
+
+  test("similitudes da uno a dos huellas no vacías idénticas") {
+    val huella = Set(Vector("gato", "duerme"), Vector("en", "casa"))
+    assert(similitudes(Vector(huella, huella), Vector((0, 1))) ==
+      Vector((0, 1, 1.0)))
+  }
+
+  test("similitudes da cero si ambas huellas están vacías") {
+    val vacia: Huella = Set.empty
+    assert(similitudes(Vector(vacia, vacia), Vector((0, 1))) ==
+      Vector((0, 1, 0.0)))
+  }
+
+  test("similitudes no produce mediciones sin parejas de entrada") {
+    assert(similitudes(Vector(Set(Vector("a"))), Vector.empty).isEmpty)
+  }
+
+  test("indiceInvertido devuelve un mapa vacío para un corpus vacío") {
+    assert(indiceInvertido(Vector.empty).isEmpty)
+  }
+
+  test("indiceInvertido incluye todos los fragmentos de una sola huella") {
+    val hs = Vector(Set(Vector("a"), Vector("b"), Vector("c")))
+    assert(indiceInvertido(hs) ==
+      Map(Vector("a") -> Set(0), Vector("b") -> Set(0), Vector("c") -> Set(0)))
+  }
+
+  test("indiceInvertido registra publicaciones compartidas por tres documentos") {
+    val fragmento = Vector("x", "y")
+    val hs = Vector(Set(fragmento), Set(fragmento), Set(fragmento))
+    assert(indiceInvertido(hs) == Map(fragmento -> Set(0, 1, 2)))
+  }
+
+  test("indiceInvertido conserva la posición original tras una huella vacía") {
+    val hs = Vector(Set(Vector("primero")), Set.empty[Fragmento], Set(Vector("tercero")))
+    assert(indiceInvertido(hs) ==
+      Map(Vector("primero") -> Set(0), Vector("tercero") -> Set(2)))
+  }
+
+  test("indiceInvertido distingue fragmentos con palabras diferentes") {
+    val hs = Vector(Set(Vector("a", "b")), Set(Vector("a"), Vector("b")))
+    assert(indiceInvertido(hs) == Map(
+      Vector("a", "b") -> Set(0),
+      Vector("a") -> Set(1),
+      Vector("b") -> Set(1)
+    ))
+  }
+
+  test("parejasCandidatas combina dos grupos de documentos independientes") {
+    val indice: Indice = Map(
+      Vector("a") -> Set(0, 3, 5),
+      Vector("b") -> Set(1, 2, 4)
+    )
+    assert(parejasCandidatas(indice) ==
+      Vector((0, 3), (0, 5), (1, 2), (1, 4), (2, 4), (3, 5)))
+  }
+
+  test("parejasCandidatas de un índice vacío no produce parejas") {
+    assert(parejasCandidatas(Map.empty).isEmpty)
+  }
+
+  test("parejasCandidatas no crea parejas desde una publicación individual") {
+    assert(parejasCandidatas(Map(Vector("aislado") -> Set(4))).isEmpty)
+  }
+
+  test("parejasCandidatas genera todas las combinaciones de una publicación") {
+    assert(parejasCandidatas(Map(Vector("grupo") -> Set(3, 0, 2))) ==
+      Vector((0, 2), (0, 3), (2, 3)))
+  }
+
+  test("parejasCandidatas elimina repeticiones y ordena por posiciones") {
+    val indice: Indice = Map(
+      Vector("a") -> Set(5, 1, 3),
+      Vector("b") -> Set(3, 1),
+      Vector("c") -> Set(5, 1)
+    )
+    assert(parejasCandidatas(indice) ==
+      Vector((1, 3), (1, 5), (3, 5)))
+  }
+
+  test("ranking incluye similitudes iguales al umbral y descarta las inferiores") {
+    val mediciones = Vector((0, 1, 0.6), (0, 2, 0.59), (1, 2, 0.9))
+    assert(ranking(mediciones, 0.6, 10) ==
+      Vector((1, 2, 0.9), (0, 1, 0.6)))
+  }
+
+  test("ranking desempata por las posiciones de las parejas") {
+    val mediciones = Vector((2, 3, 0.7), (0, 2, 0.7), (0, 1, 0.7))
+    assert(ranking(mediciones, 0.0, 10) ==
+      Vector((0, 1, 0.7), (0, 2, 0.7), (2, 3, 0.7)))
+  }
+
+  test("ranking con tope uno devuelve solo la similitud más alta") {
+    val mediciones = Vector((0, 1, 0.4), (0, 2, 0.1), (1, 2, 0.9))
+    assert(ranking(mediciones, 0.0, 1) == Vector((1, 2, 0.9)))
+  }
+
+  test("ranking no devuelve resultados si no hay mediciones") {
+    assert(ranking(Vector.empty, 0.0, 5).isEmpty)
+  }
+
+  test("ranking con tope cero devuelve un vector vacío") {
+    assert(ranking(Vector((0, 1, 0.8)), 0.0, 0).isEmpty)
   }
 
 }
