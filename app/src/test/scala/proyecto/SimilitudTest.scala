@@ -342,4 +342,156 @@ class SimilitudTest extends AnyFunSuite {
     } yield (i, j)).toVector
     assert(parejasCandidatas(indiceInvertido(hs)) == esperado)
   }
+  ///INTEGRANTE 4 - Juan stevan cataño
+
+  // Pruebas ranking
+
+  test("ranking: filtra por umbral incluyendo igualdad exacta y descarta menores") {
+    val meds = Vector(
+      (0, 1, 0.75),
+      (0, 2, 0.50),
+      (1, 2, 0.4999),
+      (1, 3, 0.10)
+    )
+    val res = ranking(meds, 0.50, 10)
+    assert(res == Vector((0, 1, 0.75), (0, 2, 0.50)))
+  }
+
+  test("ranking: ordena de mayor a menor y desempata de forma determinista por indices") {
+    val meds = Vector(
+      (2, 4, 0.60),
+      (0, 3, 0.60),
+      (1, 2, 0.90),
+      (0, 1, 0.60)
+    )
+    val res = ranking(meds, 0.50, 10)
+    assert(res == Vector((1, 2, 0.90), (0, 1, 0.60), (0, 3, 0.60), (2, 4, 0.60)))
+  }
+
+  test("ranking: trunca exactamente a los primeros p elementos") {
+    val meds = Vector(
+      (0, 1, 0.20),
+      (0, 2, 0.85),
+      (1, 2, 0.70),
+      (2, 3, 0.95)
+    )
+    val res = ranking(meds, 0.10, 2)
+    assert(res == Vector((2, 3, 0.95), (0, 2, 0.85)))
+  }
+
+  test("ranking: retorna vacio ante entrada vacia o cuando ninguna supera el umbral") {
+    val meds = Vector((0, 1, 0.45), (1, 2, 0.89))
+    assert(ranking(Vector.empty, 0.1, 5) == Vector.empty)
+    assert(ranking(meds, 0.90, 5) == Vector.empty)
+  }
+
+  test("ranking: maneja tope p <= 0 y umbral 0.0 correctamente") {
+    val meds = Vector((0, 1, 0.0), (1, 2, 0.3))
+    assert(ranking(meds, 0.0, 0) == Vector.empty)
+    assert(ranking(meds, 0.0, 2) == Vector((1, 2, 0.3), (0, 1, 0.0)))
+  }
+
+
+  // Pruebas detectarDirecto
+
+
+  test("detectarDirecto: identifica documentos identicos con similitud 1.0") {
+    val c = Vector(
+      ("D0", normalizar("El sol brilla sobre el mar azul")),
+      ("D1", normalizar("El sol brilla sobre el mar azul")),
+      ("D2", normalizar("La luna ilumina la noche oscura"))
+    )
+    val res = detectarDirecto(c, 3, 0.5, 5)
+    assert(res == Vector((0, 1, 1.0)))
+  }
+
+  test("detectarDirecto: ubica en primer lugar la copia parcial sembrada con corpusConCopias") {
+    val c = corpusConCopias(6, 40, 25, 1, 0.85)
+    val res = detectarDirecto(c, 3, 0.3, 3)
+    assert(res.nonEmpty)
+    assert(res.head._1 == 0 && res.head._2 == 6)
+  }
+
+  test("detectarDirecto: documentos mas cortos que k producen huella vacia y similitud 0") {
+    val c = Vector(
+      ("D0", Vector("hola", "mundo")),
+      ("D1", Vector("hola", "mundo")),
+      ("D2", Vector("solo"))
+    )
+    assert(detectarDirecto(c, 4, 0.01, 5) == Vector.empty)
+  }
+
+  test("detectarDirecto: corpus vacio o de un solo documento retorna ranking vacio") {
+    val c1 = Vector(("D0", normalizar("Un unico texto en el repositorio")))
+    assert(detectarDirecto(Vector.empty, 3, 0.1, 5) == Vector.empty)
+    assert(detectarDirecto(c1, 3, 0.1, 5) == Vector.empty)
+  }
+
+  test("detectarDirecto: aplica umbral y tope p sobre similitudes escalonadas") {
+    val c = Vector(
+      ("D0", Vector("a", "b", "c", "d")),
+      ("D1", Vector("a", "b", "c", "x")),
+      ("D2", Vector("a", "b", "y", "z")),
+      ("D3", Vector("a", "b", "c", "d"))
+    )
+    val res = detectarDirecto(c, 2, 0.5, 2)
+    assert(res == Vector((0, 3, 1.0), (0, 1, 0.5)))
+  }
+
+
+  // Pruebas detectarConIndice
+
+
+  test("detectarConIndice: produce el mismo ranking que detectarDirecto para umbral > 0") {
+    val c = Vector(
+      ("D0", normalizar("los algoritmos funcionales evitan el estado mutable")),
+      ("D1", normalizar("los algoritmos funcionales usan recursion e inmutabilidad")),
+      ("D2", normalizar("la musica clasica requiere disciplina y practica diaria")),
+      ("D3", normalizar("el estado mutable dificulta la concurrencia segura"))
+    )
+    val directo = detectarDirecto(c, 2, 0.1, 10)
+    val conIndice = detectarConIndice(c, 2, 0.1, 10)
+    assert(conIndice == directo)
+  }
+
+  test("detectarConIndice: retorna vacio cuando ningun par comparte fragmentos") {
+    val c = Vector(
+      ("D0", normalizar("primavera verano otono invierno")),
+      ("D1", normalizar("mercurio venus tierra marte")),
+      ("D2", normalizar("triangulo cuadrado pentagono hexagono"))
+    )
+    assert(detectarConIndice(c, 2, 0.01, 5) == Vector.empty)
+  }
+
+  test("detectarConIndice: calcula Jaccard exacto con repeticion interna de fragmentos") {
+    val c = Vector(
+      ("D0", Vector("uno", "dos", "uno", "dos", "uno")),
+      ("D1", Vector("uno", "dos", "tres"))
+    )
+    val res = detectarConIndice(c, 2, 0.3, 5)
+    assert(res.length == 1)
+    assert(res.head._1 == 0 && res.head._2 == 1)
+    assert(math.abs(res.head._3 - (1.0 / 3.0)) < 1e-9)
+  }
+
+  test("detectarConIndice: maneja documentos con t < k mezclados con documentos validos") {
+    val c = Vector(
+      ("D0", Vector("corto")),
+      ("D1", normalizar("arquitectura moderna de software distribuido")),
+      ("D2", normalizar("arquitectura moderna de sistemas concurrentes")),
+      ("D3", Vector("dos", "palabras"))
+    )
+    val res = detectarConIndice(c, 3, 0.2, 5)
+    assert(res == detectarDirecto(c, 3, 0.2, 5))
+    assert(res.map(m => (m._1, m._2)) == Vector((1, 2)))
+  }
+
+  test("detectarConIndice: coincide con detectarDirecto en corpusConCopias") {
+    val c = corpusConCopias(8, 50, 30, 2, 0.75)
+    val resIndice = detectarConIndice(c, 3, 0.25, 5)
+    val resDirecto = detectarDirecto(c, 3, 0.25, 5)
+    assert(resIndice == resDirecto)
+  }
+
+
 }
